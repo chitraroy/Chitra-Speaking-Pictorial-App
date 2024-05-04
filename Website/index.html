@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>Pictorial Translator</title>
+
+    <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+    <link rel="stylesheet" href="https://www.w3schools.com/lib/w3-theme-blue-grey.css">
+</head>
+
+<body class="w3-theme-14">
+    <div style="min-width:400px">
+        <div class="w3-bar w3-large w3-theme-d4">
+            <span class="w3-bar-item">Pictorial Translator</span>
+        </div>
+
+        <div class="w3-container w3-content">
+            <p class="w3-opacity"><b>Upload</b></p>
+            <input id="file" type="file" name="file" accept="image/*" />
+            <input class="w3-button w3-blue-grey" type="submit" value="Upload" onclick="uploadAndTranslate()" />
+
+            <p class="w3-opacity"><b>Image</b></p>
+            <div id="view" class="w3-panel w3-white w3-card w3-display-container" style="display:none;">
+                <div style="float: left;">
+                    <img id="image" width="600" />
+                </div>
+                <div style="float: right;">
+                    <h5>Translated Text:</h5>
+                    <div id="translations" />
+
+                    <!-- Audio Controls -->
+                    <audio controls autoplay muted id="audioElement">
+                        <!-- You can replace these source URLs with actual URLs -->
+                        <source src="horse.ogg" type="audio/ogg">
+                        <source src="horse.mp3" type="audio/mpeg">
+                        Your browser does not support the audio element.
+                    </audio>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- <script src="script.js"></script> -->
+    <script>
+        "use strict";
+
+        const serverUrl = "http://127.0.0.1:8000/";
+
+        async function uploadImage() {
+            // encode input file as base64 string for upload
+            let file = document.getElementById("file").files[0];
+            let converter = new Promise(function (resolve, reject) {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result
+                    .toString().replace(/^data:(.*,)?/, ''));
+                reader.onerror = (error) => reject(error);
+            });
+            let encodedString = await converter;
+
+            // clear file upload input field
+            document.getElementById("file").value = "";
+
+            // make server call to upload image
+            // and return the server upload promise
+            return fetch(serverUrl + "images", {
+                method: "POST",
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ filename: file.name, filebytes: encodedString })
+            }).then(response => {
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    throw new HttpError(response);
+                }
+            })
+        }
+
+        function updateImage(image) {
+            document.getElementById("view").style.display = "block";
+
+            let imageElem = document.getElementById("image");
+            imageElem.src = image["fileUrl"];
+            imageElem.alt = image["fileId"];
+
+            return image;
+        }
+
+        function translateImage(image) {
+            console.log("translateImage", image);
+            // make server call to translate image
+            // and return the server upload promise
+            return fetch(serverUrl + "images/" + image["fileId"] + "/translate-text", {
+                method: "POST",
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ fromLang: "auto", toLang: "en" })
+            }).then(response => {
+                if (response.ok) {
+                    return response.json();
+                } else {
+                    throw new HttpError(response);
+                }
+            })
+        }
+
+        function annotateImage(translations) {
+            let translationsElem = document.getElementById("translations");
+            while (translationsElem.firstChild) {
+                translationsElem.removeChild(translationsElem.firstChild);
+            }
+            translationsElem.clear
+            for (let i = 0; i < translations.length; i++) {
+                let translationElem = document.createElement("h6");
+                translationElem.appendChild(document.createTextNode(
+                    translations[i]["text"] + " -> " + translations[i]["translation"]["translatedText"]
+                ));
+
+                //The controls attribute adds audio controls, like play, pause, and volume.
+                let textToSpeechElem = document.createElement("audio");
+                textToSpeechElem.controls = "controls"
+
+                // File path, format and media type
+                let mp3FileElem = document.createElement("source");
+                mp3FileElem.src = translations[i]["audio_info"]["fileUrl"];
+                mp3FileElem.type = "audio/mpeg"; //MP3
+
+                textToSpeechElem.appendChild(mp3FileElem);
+                translationsElem.appendChild(document.createElement("hr"));
+                translationsElem.appendChild(translationElem);
+                translationsElem.appendChild(textToSpeechElem);
+            }
+        }
+
+        function uploadAndTranslate() {
+            uploadImage()
+                .then(image => updateImage(image))
+                .then(image => translateImage(image))
+                .then(translations => annotateImage(translations))
+                .catch(error => {
+                    alert("Error: " + error);
+                })
+            // console.log(MIN_CONFIDENCE)
+        }
+
+        class HttpError extends Error {
+            constructor(response) {
+                super(`${response.status} for ${response.url}`);
+                this.name = "HttpError";
+                this.response = response;
+            }
+        }
+
+
+
+
+
+
+    </script>
+</body>
+
+</html>
